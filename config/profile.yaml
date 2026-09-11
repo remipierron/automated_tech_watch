@@ -1,0 +1,49 @@
+profile:
+  name: "Rémi Pierron"
+  email: "remi.pierron01@etu.univ-poitiers.fr"
+  keywords:
+    # Anglais
+    - "machine learning"
+    - "deep learning"
+    - "large language model"
+    - "LLM"
+    - "data science"
+    - "neural network"
+    - "transformer"
+    - "computer vision"
+    - "NLP"
+    - "python"
+    - "pyspark"
+    - "hugging face"
+    - "tensorflow"
+    - "random forest"
+    - "data visualization"
+    - "artificial intelligence"
+    - "generative AI"
+    - "fine-tuning"
+    - "embedding"
+    # Français
+    - "intelligence artificielle"
+    - "apprentissage automatique"
+    - "apprentissage profond"
+    - "réseau de neurones"
+    - "modèle de langage"
+    - "traitement des données"
+    - "visualisation de données"
+    - "science des données"
+    - "vision par ordinateur"
+    - "traitement du langage"
+    - "algorithme"
+    - "modèle prédictif"
+    - "données massives"
+    - "big data"
+    - "IA générative"
+    - "classification"
+    - "régression"
+  language: "fr+en"
+  max_articles: 5
+  schedule_time: "08:00"
+
+output:
+  send_email: false        # Passer à true quand SMTP configuré
+  show_dashboard: true
