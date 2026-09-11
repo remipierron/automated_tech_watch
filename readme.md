@@ -45,7 +45,7 @@ L'outil est pensé comme un **digest quotidien intelligent**, sans intervention 
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────┐
-│          TRAITEMENT LLM (Qwen2.5 3B local)                │
+│          TRAITEMENT LLM (Mistral AI, via API)              │
 │  Résumé par article · Résumé général · Scoring final    │
 └────────────────────────┬────────────────────────────────┘
                          │
@@ -65,7 +65,7 @@ L'outil est pensé comme un **digest quotidien intelligent**, sans intervention 
 | Langage principal | Python 3.11+ |
 | Collecte RSS | `feedparser` |
 | Scraping web | `requests`, `BeautifulSoup4` |
-| LLM | Modèle local léger (`qwen2.5:3b` via Ollama) |
+| LLM | API Mistral AI (`mistral-small-latest`) |
 | Recherche web temps réel | Claude API + web search tool |
 | Planification | `schedule` / `cron` |
 | Envoi e-mail | `smtplib` |
@@ -138,7 +138,7 @@ Cette semaine en Data Science & IA : [synthèse en 3-4 phrases des tendances du 
 
 ### Option A — Docker (recommandé, 100% automatisé)
 
-Nécessite [Docker](https://www.docker.com/) et Docker Compose. Tout est orchestré par `docker-compose.yml` : le serveur Ollama, le téléchargement automatique du modèle (`qwen2.5:3b` par défaut), le scheduler quotidien et le dashboard.
+Nécessite [Docker](https://www.docker.com/) et Docker Compose. Tout est orchestré par `docker-compose.yml` : le scheduler quotidien et le dashboard (les résumés sont générés via l'API Mistral, aucun modèle local à télécharger).
 
 ```bash
 # Cloner le dépôt
@@ -147,10 +147,10 @@ cd techwatch
 
 # Configurer les variables d'environnement
 cp .env.example .env
-# → Renseigner SMTP_PASSWORD, EMAIL_RECIPIENT, etc.
+# → Renseigner MISTRAL_API_KEY, SMTP_PASSWORD, EMAIL_RECIPIENT, etc.
 
-# Tout démarrer (build de l'image, lancement d'Ollama, pull du modèle,
-# démarrage du scheduler + du dashboard) — une seule commande
+# Tout démarrer (build de l'image, démarrage du scheduler + du dashboard)
+# — une seule commande
 docker compose up -d
 ```
 
@@ -159,7 +159,7 @@ docker compose up -d
 - `storage/` et `config/` sont montés en volumes locaux : les digests et la base SQLite persistent entre redémarrages, et les fichiers de config peuvent être modifiés sans reconstruire l'image.
 - `docker compose logs -f scheduler` pour suivre l'exécution ; `docker compose down` pour tout arrêter.
 
-> **Sur Raspberry Pi (ou autre CPU sans GPU) :** tout l'écosystème (image Python, image Ollama, dépendances pip) est compatible `arm64`, donc `docker compose up -d` fonctionne tel quel. Le modèle par défaut (`qwen2.5:3b`, ~2 Go) est choisi pour rester léger en inférence CPU-only et en espace disque sur la carte SD. Si besoin, d'autres alternatives sont commentées dans `.env.example` (`OLLAMA_MODEL`) ; ajuste `OLLAMA_TIMEOUT` en conséquence.
+> **Sur Raspberry Pi (ou autre CPU sans GPU) :** l'écosystème (image Python, dépendances pip) est compatible `arm64`, donc `docker compose up -d` fonctionne tel quel. Les résumés étant générés via l'API Mistral (hébergée), aucune inférence locale n'est nécessaire.
 
 ### Option B — Installation locale
 
@@ -173,10 +173,7 @@ pip install -r requirements.txt
 
 # Configurer les variables d'environnement
 cp .env.example .env
-# → Renseigner SMTP_PASSWORD, etc.
-
-# Installer Ollama et récupérer le modèle
-ollama pull qwen2.5:3b
+# → Renseigner MISTRAL_API_KEY, SMTP_PASSWORD, etc.
 
 # Lancer manuellement
 python main.py

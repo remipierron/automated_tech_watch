@@ -1,55 +1,13 @@
 services:
-  # Local LLM server (qwen2.5:3b via Ollama).
-  ollama:
-    image: ollama/ollama:latest
-    container_name: techwatch-ollama
-    volumes:
-      - ollama_data:/root/.ollama
-    healthcheck:
-      test: ["CMD-SHELL", "ollama list || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-    restart: unless-stopped
-    # Uncomment to use an NVIDIA GPU if available on the host:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-
-  # One-shot job: pulls the model into the shared volume, then exits.
-  # Runs automatically on every `docker compose up` (Ollama de-dupes the
-  # pull, so re-runs after the first are near-instant).
-  ollama-pull:
-    image: ollama/ollama:latest
-    depends_on:
-      ollama:
-        condition: service_healthy
-    environment:
-      - OLLAMA_HOST=ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:3b}
-    entrypoint: ["/bin/sh", "-c", "ollama pull \"$$OLLAMA_MODEL\""]
-    restart: "no"
-
   # Runs the daily pipeline (RSS collect -> filter -> LLM summary -> save -> email).
   scheduler:
     build: .
     container_name: techwatch-scheduler
     env_file:
       - .env
-    environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:3b}
     volumes:
       - ./storage:/app/storage
       - ./config:/app/config
-    depends_on:
-      ollama-pull:
-        condition: service_completed_successfully
     restart: unless-stopped
 
   # Streamlit dashboard, reading the same storage as the scheduler.
@@ -59,18 +17,9 @@ services:
     command: ["streamlit", "run", "output/dashboard.py", "--server.address=0.0.0.0", "--server.port=8501"]
     env_file:
       - .env
-    environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:3b}
     volumes:
       - ./storage:/app/storage
       - ./config:/app/config
     ports:
       - "8502:8501"
-    depends_on:
-      ollama-pull:
-        condition: service_completed_successfully
     restart: unless-stopped
-
-volumes:
-  ollama_data:

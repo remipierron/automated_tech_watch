@@ -1,13 +1,15 @@
 """
 processing/llm_processor.py
-Utilise un modèle local via Ollama pour résumer les articles
-et produire un résumé général de l'actualité tech.
+Utilise l'API Mistral (mode hébergé, via api.mistral.ai) pour résumer les
+articles et produire un résumé général de l'actualité tech.
 """
 
 import os
 import requests
 import yaml
 from datetime import datetime
+
+MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
 
 
 def load_profile(config_path="config/profile.yaml"):
@@ -16,14 +18,23 @@ def load_profile(config_path="config/profile.yaml"):
 
 
 def get_client():
+    api_key = os.getenv("MISTRAL_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "MISTRAL_API_KEY manquant : définis-le dans le fichier .env"
+        )
     return {
-        "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/"),
-        "model": os.getenv("OLLAMA_MODEL", "qwen2.5:3b"),
-        "timeout": int(os.getenv("OLLAMA_TIMEOUT", "120")),
+        "api_key": api_key,
+        "model": os.getenv("MISTRAL_MODEL", "mistral-small-latest"),
+        "timeout": int(os.getenv("MISTRAL_TIMEOUT", "120")),
     }
 
 
-def ollama_chat(client, prompt):
+def mistral_chat(client, prompt):
+    headers = {
+        "Authorization": f"Bearer {client['api_key']}",
+        "Content-Type": "application/json",
+    }
     payload = {
         "model": client["model"],
         "messages": [{"role": "user", "content": prompt}],
@@ -31,24 +42,28 @@ def ollama_chat(client, prompt):
     }
 
     response = requests.post(
-        f"{client['base_url']}/api/chat",
+        MISTRAL_API_URL,
+        headers=headers,
         json=payload,
         timeout=client["timeout"],
     )
     response.raise_for_status()
     data = response.json()
 
-    content = data.get("message", {}).get("content")
+    try:
+        content = data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        content = None
+
     if not isinstance(content, str):
-        raise ValueError("Réponse Ollama invalide: champ 'message.content' manquant")
+        raise ValueError("Réponse Mistral invalide: champ 'choices[0].message.content' manquant")
 
     return content.strip()
 
 
 def summarize_article(client, article):
     """
-    Demande au LLM de résumer un article en 3-5 lignes
-    en utilisant Google Search pour accéder au contenu réel.
+    Demande au LLM de résumer un article en 3-5 lignes.
     """
     prompt = f"""Tu es un assistant de veille technologique pour un étudiant en Data Science.
 
@@ -58,8 +73,6 @@ Voici un article à résumer :
 - URL : {article['url']}
 - Extrait disponible : {article.get('summary', "Pas d'extrait disponible")}
 
-Utilise ta capacité de recherche web pour accéder au contenu complet de cet article si possible.
-
 Produis un résumé en français en 3 à 5 phrases maximum. Sois concis, informatif et mets en avant :
 1. Le sujet principal
 2. Les résultats ou conclusions clés
@@ -68,7 +81,7 @@ Produis un résumé en français en 3 à 5 phrases maximum. Sois concis, informa
 Ne commence pas par "Cet article" ou "L'article". Va droit au but."""
 
     try:
-        return ollama_chat(client, prompt)
+        return mistral_chat(client, prompt)
     except Exception as e:
         print(f"    ⚠️  Erreur LLM pour '{article['title']}' : {e}")
         return article.get("summary", "Résumé non disponible.")
@@ -99,7 +112,7 @@ Ce résumé doit :
 Commence directement par le résumé, sans titre ni introduction."""
 
     try:
-        return ollama_chat(client, prompt)
+        return mistral_chat(client, prompt)
     except Exception as e:
         print(f"    ⚠️  Erreur LLM résumé général : {e}")
         return "Résumé général non disponible."

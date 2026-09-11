@@ -62,7 +62,7 @@ def run():
         sys.exit(1)
 
     # 3. Traitement LLM
-    print("\n🤖 Étape 3 — Résumés via LLM local (Ollama)...")
+    print("\n🤖 Étape 3 — Résumés via l'API Mistral...")
     digest = process_articles(top_articles)
 
     # 4. Sauvegarde
