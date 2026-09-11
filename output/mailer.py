@@ -3,7 +3,9 @@ output/mailer.py
 Envoie le digest quotidien par e-mail au format HTML.
 """
 
+import html
 import os
+import re
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -12,18 +14,42 @@ from email.mime.text import MIMEText
 MEDALS = ["🥇", "🥈", "🥉", "④", "⑤"]
 
 
+def markdown_to_html(text):
+    """
+    Convertit le markdown minimal produit par le LLM (gras, italique,
+    paragraphes) en HTML, pour un rendu correct dans le corps de l'e-mail
+    (sinon les **astérisques** s'affichent littéralement).
+    """
+    text = html.escape(text or "")
+
+    # Gras : **texte** ou __texte__ (traité avant l'italique pour ne pas
+    # confondre les ** avec deux * isolés)
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+    text = re.sub(r"__(.+?)__", r"<strong>\1</strong>", text)
+
+    # Italique : *texte* ou _texte_
+    text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", text)
+    text = re.sub(r"(?<!_)_(?!_)(.+?)(?<!_)_(?!_)", r"<em>\1</em>", text)
+
+    # Paragraphes : double saut de ligne -> nouveau paragraphe,
+    # simple saut de ligne -> retour à la ligne
+    paragraphs = [p.strip().replace("\n", "<br>") for p in text.split("\n\n") if p.strip()]
+    return "".join(f'<p style="margin:0 0 8px;">{p}</p>' for p in paragraphs)
+
+
 def digest_to_html(digest):
     articles_html = ""
     for i, art in enumerate(digest["articles"]):
         medal = MEDALS[i] if i < len(MEDALS) else f"{i+1}."
         score_bar = "█" * int(art.get("score", 0) / 10) + "░" * (10 - int(art.get("score", 0) / 10))
+        summary_html = markdown_to_html(art.get("llm_summary", art.get("summary", "")))
         articles_html += f"""
         <div style="margin-bottom:24px; padding:16px; background:#f8f9fa; border-left:4px solid #2563eb; border-radius:4px;">
-            <div style="font-size:18px; font-weight:bold; margin-bottom:4px;">{medal} {art['title']}</div>
+            <div style="font-size:18px; font-weight:bold; margin-bottom:4px;">{medal} {html.escape(art['title'])}</div>
             <div style="font-size:12px; color:#6b7280; margin-bottom:8px;">
-                📰 {art['source']} &nbsp;|&nbsp; Score : {score_bar} ({art.get('score', 0):.0f}/100)
+                📰 {html.escape(art['source'])} &nbsp;|&nbsp; Score : {score_bar} ({art.get('score', 0):.0f}/100)
             </div>
-            <p style="margin:0 0 8px; color:#374151; line-height:1.6;">{art.get('llm_summary', art.get('summary', ''))}</p>
+            <div style="color:#374151; line-height:1.6;">{summary_html}</div>
             <a href="{art['url']}" style="color:#2563eb; font-size:13px;">🔗 Lire l'article complet</a>
         </div>
         """
@@ -37,7 +63,7 @@ def digest_to_html(digest):
 
         <div style="padding:20px; background:#eff6ff; border-left:4px solid #3b82f6;">
             <h2 style="margin:0 0 8px; font-size:15px; color:#1e40af;">🌐 Résumé général</h2>
-            <p style="margin:0; line-height:1.7; color:#1f2937;">{digest['general_summary']}</p>
+            <div style="line-height:1.7; color:#1f2937;">{markdown_to_html(digest['general_summary'])}</div>
         </div>
 
         <div style="padding:20px;">
