@@ -2,3 +2,8 @@
 venv/
 test_
 .venv/
+
+# Données générées à chaque run (digest du jour, base SQLite) : pas de code,
+# ne devrait pas être versionné — voir storage/ pour la structure attendue.
+storage/last_digest.json
+storage/techwatch.db
